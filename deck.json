@@ -1,0 +1,62 @@
+{
+  "v": 5,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-11-25T06:40:00Z"
+  },
+  "lists": "css",
+  "format": {
+    "v": 1,
+    "shared": [
+      "project/deck.css"
+    ]
+  },
+  "title": "How Fine-Tuning Updates Produce Concepts in Single-Stream Diffusion Transformers",
+  "cover": "cover",
+  "order": [
+    "cover",
+    "hook",
+    "model",
+    "arch",
+    "attnmlp",
+    "finetune",
+    "mech",
+    "whyarch",
+    "problem",
+    "rrl",
+    "objectives",
+    "setup",
+    "runs",
+    "iv",
+    "measureS",
+    "search",
+    "measureD",
+    "patching",
+    "testing"
+  ],
+  "sections": {
+    "s1": {
+      "description": "Introduction",
+      "start": "cover"
+    },
+    "s2": {
+      "description": "Review of literature",
+      "start": "rrl"
+    },
+    "s3": {
+      "description": "Objectives",
+      "start": "objectives"
+    },
+    "s4": {
+      "description": "Methodology",
+      "start": "setup"
+    }
+  },
+  "faces": {
+    "public-sans": {
+      "family": "Public Sans",
+      "href": "https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;1,400&display=swap"
+    }
+  },
+  "designSystems": []
+}

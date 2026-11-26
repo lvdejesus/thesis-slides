@@ -1,0 +1,788 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>How Fine-Tuning Updates Produce Concepts in Single-Stream Diffusion Transformers</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="deck.css" />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+        background: var(--beige);
+        color: var(--ink);
+        font-family: 'Public Sans', Arial, sans-serif;
+        user-select: none;
+      }
+
+      body.on-accent {
+        background: var(--deep);
+      }
+
+      /* ---------------------------------------------------------------- stage */
+
+      #stage {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+        background: var(--beige);
+        transform-origin: center center;
+      }
+
+      #slides {
+        position: absolute;
+        inset: 0;
+      }
+
+      .slide-wrap {
+        position: absolute;
+        inset: 0;
+        width: 1920px;
+        height: 1080px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.16s ease;
+      }
+
+      .slide-wrap.active {
+        opacity: 1;
+        pointer-events: auto;
+        z-index: 1;
+      }
+
+      .slide-wrap > section {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+      }
+
+      /* ------------------------------------------------------------- progress */
+
+      #progress {
+        position: absolute;
+        left: 128px;
+        right: 128px;
+        bottom: 36px;
+        display: flex;
+        gap: 6px;
+        height: 6px;
+        z-index: 10;
+      }
+
+      .tick {
+        position: relative;
+        flex: 1 1 0;
+        border-radius: 3px;
+        background: rgba(42, 36, 49, 0.16);
+        cursor: pointer;
+        transition: background 0.25s;
+      }
+
+      .tick::before {
+        content: '';
+        position: absolute;
+        inset: -18px -2px;
+      }
+
+      .tick:hover {
+        background: var(--ink);
+      }
+
+      .tick.section-start {
+        margin-left: 22px;
+      }
+
+      .tick.done {
+        background: rgba(94, 86, 104, 0.55);
+      }
+
+      .tick.current {
+        background: var(--purple);
+      }
+
+      #stage.on-accent .tick {
+        background: rgba(243, 238, 228, 0.24);
+      }
+
+      #stage.on-accent .tick:hover {
+        background: var(--beige);
+      }
+
+      #stage.on-accent .tick.done {
+        background: rgba(228, 217, 242, 0.55);
+      }
+
+      #stage.on-accent .tick.current {
+        background: var(--beige);
+      }
+
+      #tip {
+        position: absolute;
+        bottom: 62px;
+        transform: translateX(-50%);
+        padding: 10px 18px;
+        border: 1px solid #d6ccbb;
+        border-radius: 10px;
+        background: var(--beige2);
+        color: var(--ink);
+        font-size: 22px;
+        line-height: 1.25;
+        white-space: nowrap;
+        pointer-events: none;
+        z-index: 20;
+      }
+
+      /* ------------------------------------------------------------------ hud */
+
+      #hud {
+        position: absolute;
+        left: 128px;
+        bottom: 6px;
+        display: flex;
+        gap: 28px;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 18px;
+        color: var(--soft);
+        font-variant-numeric: tabular-nums;
+        z-index: 15;
+      }
+
+      #hud .hud-time {
+        color: var(--ink);
+      }
+
+      #stage.on-accent #hud {
+        color: var(--lav);
+      }
+
+      #stage.on-accent #hud .hud-time {
+        color: var(--beige);
+      }
+
+      /* ------------------------------------------------------------- overview */
+
+      #overview {
+        position: fixed;
+        inset: 0;
+        overflow-y: auto;
+        padding: 40px clamp(20px, 4vw, 64px) 80px;
+        background: var(--beige);
+        color: var(--ink);
+        z-index: 100;
+        user-select: text;
+      }
+
+      .ov-top {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .ov-title {
+        font-size: 28px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+        color: var(--ink);
+      }
+
+      .ov-sub {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 13px;
+        color: var(--soft);
+      }
+
+      .ov-section {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        margin: 36px 0 16px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #d6ccbb;
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--ink);
+      }
+
+      .ov-section .num {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 14px;
+        color: var(--purple);
+      }
+
+      .ov-section .count {
+        margin-left: auto;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 13px;
+        font-weight: 400;
+        color: var(--soft);
+      }
+
+      .ov-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 18px;
+      }
+
+      .ov-card {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 12px;
+        border: 2px solid #d6ccbb;
+        border-radius: 12px;
+        background: var(--beige2);
+        color: var(--ink);
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 0.15s, transform 0.15s;
+      }
+
+      .ov-card:hover {
+        border-color: var(--purple);
+        transform: translateY(-2px);
+      }
+
+      .ov-card.current {
+        border-color: var(--purple);
+        box-shadow: 0 0 0 2px var(--lav);
+      }
+
+      .ov-thumb {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        overflow: hidden;
+        border-radius: 6px;
+        background: var(--beige);
+        border: 1px solid rgba(42, 36, 49, 0.1);
+      }
+
+      .ov-thumb-inner {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 1920px;
+        height: 1080px;
+        transform-origin: top left;
+        pointer-events: none;
+      }
+
+      .ov-thumb-inner > section {
+        width: 1920px;
+        height: 1080px;
+        overflow: hidden;
+      }
+
+      .ov-meta {
+        display: flex;
+        justify-content: space-between;
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-size: 12px;
+        color: var(--soft);
+      }
+
+      .ov-label {
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.3;
+        color: var(--ink);
+      }
+      /* ------------------------------------------------------- section label */
+      #seclabel {
+        position: absolute;
+        top: 52px;
+        right: 128px;
+        z-index: 10;
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: 1.5px;
+        color: var(--purple);
+        text-align: right;
+      }
+      #seclabel .sub {
+        color: var(--soft);
+        font-weight: 400;
+      }
+      /* ------------------------------------------------------------ builds */
+      [data-in],
+      [data-out] {
+        transition: opacity 0.6s ease;
+      }
+      [data-tf] {
+        transform-origin: 0 0;
+        transition: transform 1.1s cubic-bezier(0.45, 0, 0.2, 1), opacity 0.6s ease;
+      }
+      .hid {
+        opacity: 0 !important;
+        pointer-events: none;
+      }
+      #stage.instant *,
+      #stage.instant *::before,
+      #stage.instant *::after {
+        transition: none !important;
+        animation-duration: 0s !important;
+        animation-delay: 0s !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <div id="slides"></div>
+      <div id="seclabel"></div>
+      <div id="progress"></div>
+      <div id="hud" hidden></div>
+      <div id="tip" hidden></div>
+    </div>
+    <div id="overview" hidden></div>
+
+    <script>
+      const STAGE_W = 1920
+      const STAGE_H = 1080
+
+      const stage = document.getElementById('stage')
+      const slidesEl = document.getElementById('slides')
+      const progressEl = document.getElementById('progress')
+      const hudEl = document.getElementById('hud')
+      const tipEl = document.getElementById('tip')
+      const overviewEl = document.getElementById('overview')
+
+      const SECTION_NAMES = {
+        s1: { numeral: 'I', title: 'Introduction' },
+        s2: { numeral: 'II', title: 'Review of literature' },
+        s3: { numeral: 'III', title: 'Objectives' },
+        s4: { numeral: 'IV', title: 'Methodology' },
+      }
+
+      let slides = []
+      let current = 0
+      let step = 0
+      const seclabelEl = document.getElementById('seclabel')
+
+      function stepsOf(i) {
+        return Number(slides[i].sectionEl.dataset.steps || 1)
+      }
+
+      // Builds: [data-in=k] shows from step k, [data-out=k] hides from step k,
+      // [data-tf] is a JSON map step -> transform (the latest key <= step applies),
+      // [data-on=k] adds the class "on" from step k (until [data-off]).
+      function applyStep(sectionEl, k) {
+        sectionEl.dataset.step = k
+        for (let i = 1; i < 12; i++) sectionEl.classList.toggle(`s${i}`, k >= i)
+        for (const el of sectionEl.querySelectorAll('[data-in], [data-out]')) {
+          const a = el.dataset.in === undefined ? 0 : Number(el.dataset.in)
+          const b = el.dataset.out === undefined ? Infinity : Number(el.dataset.out)
+          el.classList.toggle('hid', !(k >= a && k < b))
+        }
+        for (const el of sectionEl.querySelectorAll('[data-tf]')) {
+          const map = JSON.parse(el.dataset.tf)
+          let best = null
+          for (const key of Object.keys(map)) if (Number(key) <= k && (best === null || Number(key) > best)) best = Number(key)
+          el.style.transform = best === null ? '' : map[best]
+        }
+        for (const el of sectionEl.querySelectorAll('[data-on]')) {
+          const a = Number(el.dataset.on)
+          const b = el.dataset.off === undefined ? Infinity : Number(el.dataset.off)
+          el.classList.toggle('on', k >= a && k < b)
+        }
+      }
+
+      function instantly(fn) {
+        stage.classList.add('instant')
+        fn()
+        void stage.offsetWidth
+        setTimeout(() => stage.classList.remove('instant'), 60)
+      }
+      let startedAt = Number(sessionStorage.getItem('deckStartedAt')) || null
+      let wheelLockUntil = 0
+
+      function setStartedAt(value) {
+        startedAt = value
+        if (value === null) sessionStorage.removeItem('deckStartedAt')
+        else sessionStorage.setItem('deckStartedAt', String(value))
+      }
+
+      function clock(seconds) {
+        const s = Math.round(Math.abs(seconds))
+        return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+      }
+
+      function fit() {
+        const scale = Math.min(window.innerWidth / STAGE_W, window.innerHeight / STAGE_H)
+        stage.style.transform = `translate(-50%, -50%) scale(${scale})`
+      }
+
+      function scaleOverviewThumbs() {
+        if (overviewEl.hidden) return
+        for (const box of overviewEl.querySelectorAll('.ov-thumb')) {
+          const inner = box.firstElementChild
+          if (!inner) continue
+          const scale = box.clientWidth / STAGE_W
+          inner.style.transform = `scale(${scale})`
+        }
+      }
+
+      function readHash() {
+        const params = new URLSearchParams(location.hash.slice(1))
+        const id = params.get('s') || params.get('b')
+        if (!id) return null
+        const idx = slides.findIndex((s) => s.id === id)
+        if (idx >= 0) return idx
+        const num = Number(id)
+        if (Number.isInteger(num) && num >= 1 && num <= slides.length) return num - 1
+        return null
+      }
+
+      function writeHash(index) {
+        const params = new URLSearchParams(location.hash.slice(1))
+        params.set('s', slides[index].id)
+        if (step > 0) params.set('k', step)
+        else params.delete('k')
+        history.replaceState(null, '', `#${params}`)
+      }
+
+      function extractTitle(sectionEl, id) {
+        const h = sectionEl.querySelector('h1, h2, .quote, .eyebrow')
+        if (!h) return id
+        const first = h.querySelector('span') || h
+        return first.textContent.replace(/\s+/g, ' ').trim()
+      }
+
+      function updateHud() {
+        if (hudEl.hidden || slides.length === 0) return
+        const s = slides[current]
+        const elapsed = startedAt === null ? 0 : (Date.now() - startedAt) / 1000
+        hudEl.innerHTML = ''
+        const items = [
+          ['hud-beat', `${current + 1}/${slides.length} · ${s.sectionNumeral} ${s.sectionTitle}`],
+          ['hud-id', s.id],
+          ['hud-time', clock(elapsed)],
+          ['hud-hint', 'O overview · T timer · R reset · F fullscreen'],
+        ]
+        for (const [cls, text] of items) {
+          const span = document.createElement('span')
+          span.className = cls
+          span.textContent = text
+          hudEl.append(span)
+        }
+      }
+
+      function show(index, { updateUrl = true, atStep = 0, animate = false } = {}) {
+        const clamped = Math.max(0, Math.min(slides.length - 1, index))
+        current = clamped
+        step = Math.max(0, Math.min(stepsOf(current) - 1, atStep === 'last' ? Infinity : atStep))
+        instantly(() => applyStep(slides[current].sectionEl, step))
+        const sec = slides[current].sectionEl
+        if (current === 0 || sec.dataset.label === 'none') {
+          seclabelEl.textContent = ''
+        } else {
+          seclabelEl.innerHTML = ''
+          const main = document.createElement('span')
+          main.textContent = slides[current].sectionTitle
+          seclabelEl.append(main)
+          if (sec.dataset.label) {
+            const sub = document.createElement('span')
+            sub.className = 'sub'
+            sub.textContent = ` · ${sec.dataset.label}`
+            seclabelEl.append(sub)
+          }
+        }
+        if (current > 0 && startedAt === null) setStartedAt(Date.now())
+
+        slides.forEach((s, i) => {
+          s.wrap.classList.toggle('active', i === current)
+        })
+
+        const isAccent = slides[current].sectionEl.classList.contains('accent')
+        stage.classList.toggle('on-accent', isAccent)
+        document.body.classList.toggle('on-accent', isAccent)
+
+        Array.from(progressEl.children).forEach((tick, i) => {
+          tick.classList.toggle('done', i < current)
+          tick.classList.toggle('current', i === current)
+        })
+
+        for (const card of overviewEl.querySelectorAll('.ov-card')) {
+          card.classList.toggle('current', card.dataset.id === slides[current].id)
+        }
+
+        updateHud()
+        if (updateUrl) writeHash(current)
+      }
+
+      function next() {
+        if (step < stepsOf(current) - 1) {
+          step += 1
+          applyStep(slides[current].sectionEl, step)
+          writeHash(current)
+        } else if (current < slides.length - 1) {
+          show(current + 1)
+        }
+      }
+
+      function prev() {
+        if (step > 0) {
+          step -= 1
+          applyStep(slides[current].sectionEl, step)
+          writeHash(current)
+        } else if (current > 0) {
+          show(current - 1, { atStep: 'last' })
+        }
+      }
+
+      function buildProgress() {
+        slides.forEach((s, i) => {
+          const tick = document.createElement('div')
+          tick.className = 'tick'
+          if (i > 0 && s.sectionKey !== slides[i - 1].sectionKey) {
+            tick.classList.add('section-start')
+          }
+          tick.addEventListener('click', () => show(i))
+          tick.addEventListener('mouseenter', () => {
+            tipEl.textContent = `${i + 1}/${slides.length} · ${s.title}`
+            tipEl.hidden = false
+            const centre = progressEl.offsetLeft + tick.offsetLeft + tick.offsetWidth / 2
+            const half = tipEl.offsetWidth / 2
+            tipEl.style.left = `${Math.max(128 + half, Math.min(STAGE_W - 128 - half, centre))}px`
+          })
+          tick.addEventListener('mouseleave', () => {
+            tipEl.hidden = true
+          })
+          progressEl.append(tick)
+        })
+      }
+
+      function buildOverview(deck) {
+        const top = document.createElement('header')
+        top.className = 'ov-top'
+        const h = document.createElement('div')
+        h.className = 'ov-title'
+        h.textContent = deck.title
+        const sub = document.createElement('div')
+        sub.className = 'ov-sub'
+        sub.textContent = `${slides.length} slides · click one to jump to it · O or Esc to close · T for timer · F for fullscreen`
+        top.append(h, sub)
+        overviewEl.append(top)
+
+        const groups = []
+        for (const s of slides) {
+          let g = groups.find((x) => x.key === s.sectionKey)
+          if (!g) {
+            g = { key: s.sectionKey, numeral: s.sectionNumeral, title: s.sectionTitle, items: [] }
+            groups.push(g)
+          }
+          g.items.push(s)
+        }
+
+        for (const g of groups) {
+          const heading = document.createElement('div')
+          heading.className = 'ov-section'
+          const num = document.createElement('span')
+          num.className = 'num'
+          num.textContent = g.numeral
+          const name = document.createElement('span')
+          name.textContent = g.title
+          const count = document.createElement('span')
+          count.className = 'count'
+          count.textContent = `${g.items.length} ${g.items.length === 1 ? 'slide' : 'slides'}`
+          heading.append(num, name, count)
+
+          const grid = document.createElement('div')
+          grid.className = 'ov-grid'
+
+          for (const s of g.items) {
+            const card = document.createElement('button')
+            card.type = 'button'
+            card.className = 'ov-card'
+            card.dataset.id = s.id
+
+            const thumb = document.createElement('div')
+            thumb.className = 'ov-thumb'
+            const inner = document.createElement('div')
+            inner.className = 'ov-thumb-inner'
+            inner.append(s.sectionEl.cloneNode(true))
+            thumb.append(inner)
+
+            const meta = document.createElement('div')
+            meta.className = 'ov-meta'
+            const idxSpan = document.createElement('span')
+            idxSpan.textContent = `${s.index + 1}/${slides.length}`
+            const idSpan = document.createElement('span')
+            idSpan.textContent = s.id
+            meta.append(idxSpan, idSpan)
+
+            const label = document.createElement('div')
+            label.className = 'ov-label'
+            label.textContent = s.title
+
+            card.append(thumb, meta, label)
+            card.addEventListener('click', () => {
+              toggleOverview(false)
+              show(s.index)
+            })
+            grid.append(card)
+          }
+
+          overviewEl.append(heading, grid)
+        }
+      }
+
+      function toggleOverview(open = overviewEl.hidden) {
+        overviewEl.hidden = !open
+        if (open) {
+          requestAnimationFrame(() => {
+            scaleOverviewThumbs()
+            overviewEl.querySelector('.ov-card.current')?.scrollIntoView({ block: 'center' })
+          })
+        }
+      }
+
+      async function boot() {
+        fit()
+        window.addEventListener('resize', () => {
+          fit()
+          scaleOverviewThumbs()
+        })
+
+        const deck = await fetch('deck.json').then((r) => r.json())
+        document.title = deck.title
+
+        const sectionStarts = Object.entries(deck.sections || {}).map(([key, val]) => ({
+          key,
+          start: val.start,
+          ...(SECTION_NAMES[key] || { numeral: key.toUpperCase(), title: val.description }),
+        }))
+
+        const htmls = await Promise.all(
+          deck.order.map((id) => fetch(`slides/${id}.html`).then((r) => r.text())),
+        )
+
+        let activeSection = sectionStarts[0] || { key: 's1', numeral: 'I', title: 'Slides' }
+
+        slides = deck.order.map((id, index) => {
+          const hit = sectionStarts.find((sec) => sec.start === id)
+          if (hit) activeSection = hit
+
+          const wrap = document.createElement('div')
+          wrap.className = 'slide-wrap'
+          wrap.innerHTML = htmls[index]
+          const sectionEl = wrap.querySelector('section')
+          slidesEl.append(wrap)
+
+          return {
+            id,
+            index,
+            wrap,
+            sectionEl,
+            title: extractTitle(sectionEl, id),
+            sectionKey: activeSection.key,
+            sectionNumeral: activeSection.numeral,
+            sectionTitle: activeSection.title,
+          }
+        })
+
+        buildProgress()
+        slides.forEach((s, i) => applyStep(s.sectionEl, stepsOf(i) - 1))
+        buildOverview(deck)
+
+        const initial = readHash()
+        const k0 = Number(new URLSearchParams(location.hash.slice(1)).get('k') || 0)
+        show(initial ?? 0, { updateUrl: initial === null, atStep: k0 })
+        // preview aid: #...&play=<ms> advances one step after <ms>
+        const play = Number(new URLSearchParams(location.hash.slice(1)).get('play') || 0)
+        if (play) setTimeout(next, play)
+        window.setInterval(updateHud, 250)
+      }
+
+      const NEXT_KEYS = new Set(['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'])
+      const PREV_KEYS = new Set(['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'])
+
+      window.addEventListener('keydown', (e) => {
+        if (e.metaKey || e.ctrlKey || e.altKey) return
+        const key = e.key.length === 1 ? e.key.toLowerCase() : e.key
+
+        if (key === 'o') return toggleOverview()
+        if (key === 'Escape') return toggleOverview(false)
+        if (!overviewEl.hidden) return
+
+        if (NEXT_KEYS.has(key)) {
+          e.preventDefault()
+          next()
+        } else if (PREV_KEYS.has(key)) {
+          e.preventDefault()
+          prev()
+        } else if (key === 'Home') {
+          show(0)
+        } else if (key === 'End') {
+          show(slides.length - 1)
+        } else if (key === 't') {
+          hudEl.hidden = !hudEl.hidden
+          updateHud()
+        } else if (key === 'r') {
+          setStartedAt(null)
+          updateHud()
+        } else if (key === 'f') {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen?.()
+          } else {
+            document.exitFullscreen?.()
+          }
+        }
+      })
+
+      window.addEventListener(
+        'wheel',
+        (e) => {
+          if (!overviewEl.hidden) return
+          e.preventDefault()
+          const now = Date.now()
+          if (now < wheelLockUntil) return
+          if (Math.abs(e.deltaY) < 12 && Math.abs(e.deltaX) < 12) return
+          const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX
+          wheelLockUntil = now + 260
+          delta > 0 ? next() : prev()
+        },
+        { passive: false },
+      )
+
+      let touchStartX = null
+      window.addEventListener('touchstart', (e) => {
+        if (!overviewEl.hidden || e.touches.length !== 1) return
+        touchStartX = e.touches[0].clientX
+      })
+      window.addEventListener('touchend', (e) => {
+        if (touchStartX === null || !overviewEl.hidden) return
+        const dx = e.changedTouches[0].clientX - touchStartX
+        touchStartX = null
+        if (Math.abs(dx) > 48) dx < 0 ? next() : prev()
+      })
+
+      window.addEventListener('hashchange', () => {
+        const idx = readHash()
+        const k = Number(new URLSearchParams(location.hash.slice(1)).get('k') || 0)
+        if (idx !== null && (idx !== current || k !== step)) show(idx, { updateUrl: false, atStep: k })
+      })
+
+      boot()
+    </script>
+  </body>
+</html>

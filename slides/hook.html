@@ -1,0 +1,33 @@
+<section id="hook" data-steps="3" style="gap:28px"><style>
+#hook .win { width:1180px; height:720px; margin:0 auto; background:#FBF8F1; border:2px solid #C9BFB0;
+  border-radius:22px; display:flex; flex-direction:column; overflow:hidden; box-shadow:0 18px 40px rgba(42,36,49,.08) }
+#hook .bar { height:52px; background:#E6DED0; display:flex; align-items:center; gap:12px; padding:0 22px; flex:none }
+#hook .bar i { width:14px; height:14px; border-radius:50%; background:#C9BFB0; display:block }
+#hook .chat { flex:1; display:flex; flex-direction:column; gap:26px; padding:36px 48px; min-height:0 }
+#hook .user { align-self:flex-end; background:#E4D9F2; border-radius:22px 22px 6px 22px; padding:18px 28px; font-size:30px }
+#hook .reply { align-self:flex-start; position:relative; width:330px; height:330px; border-radius:16px; overflow:hidden;
+  border:2px solid #C9BFB0 }
+#hook .fr { position:absolute; inset:0; width:100%; height:100%; opacity:0 }
+#hook .f0 { opacity:1 }
+#hook.s2 .f1 { animation:hkf .5s ease 1.0s forwards }
+#hook.s2 .f2 { animation:hkf .5s ease 1.7s forwards }
+#hook.s2 .f3 { animation:hkf .5s ease 2.4s forwards }
+#hook.s2 .f4 { animation:hkf .5s ease 3.1s forwards }
+@keyframes hkf { to { opacity:1 } }
+#hook .input { margin:0 36px 32px; height:84px; border:2px solid #C9BFB0; border-radius:42px; display:flex;
+  align-items:center; padding:0 34px; font-size:30px; background:#fff; flex:none; position:relative }
+#hook .typed span { opacity:0 }
+#hook.s1 .typed span { animation:hkc .01s linear forwards }
+#hook.s2 .typed { visibility:hidden }
+@keyframes hkc { to { opacity:1 } }
+#hook .send { position:absolute; right:14px; width:56px; height:56px; border-radius:50%; background:#6E4FA0;
+  color:#fff; display:flex; align-items:center; justify-content:center; font-size:30px }</style>
+<h2>What happens when you type a prompt?</h2>
+<div class="win"><div class="bar"><i></i><i></i><i></i></div>
+<div class="chat">
+<div class="user" data-in="2">a girl floating in the night sky</div>
+<div class="reply" data-in="2"><img class="fr f0" src="img/t100.jpg" alt=""><img class="fr f1" src="img/t75.jpg" alt=""><img class="fr f2" src="img/t50.jpg" alt=""><img class="fr f3" src="img/t25.jpg" alt=""><img class="fr f4" src="img/t0.jpg" alt=""></div>
+</div>
+<div class="input"><span class="typed"><span style="animation-delay:0.300s">a</span><span style="animation-delay:0.355s">&nbsp;</span><span style="animation-delay:0.410s">g</span><span style="animation-delay:0.465s">i</span><span style="animation-delay:0.520s">r</span><span style="animation-delay:0.575s">l</span><span style="animation-delay:0.630s">&nbsp;</span><span style="animation-delay:0.685s">f</span><span style="animation-delay:0.740s">l</span><span style="animation-delay:0.795s">o</span><span style="animation-delay:0.850s">a</span><span style="animation-delay:0.905s">t</span><span style="animation-delay:0.960s">i</span><span style="animation-delay:1.015s">n</span><span style="animation-delay:1.070s">g</span><span style="animation-delay:1.125s">&nbsp;</span><span style="animation-delay:1.180s">i</span><span style="animation-delay:1.235s">n</span><span style="animation-delay:1.290s">&nbsp;</span><span style="animation-delay:1.345s">t</span><span style="animation-delay:1.400s">h</span><span style="animation-delay:1.455s">e</span><span style="animation-delay:1.510s">&nbsp;</span><span style="animation-delay:1.565s">n</span><span style="animation-delay:1.620s">i</span><span style="animation-delay:1.675s">g</span><span style="animation-delay:1.730s">h</span><span style="animation-delay:1.785s">t</span><span style="animation-delay:1.840s">&nbsp;</span><span style="animation-delay:1.895s">s</span><span style="animation-delay:1.950s">k</span><span style="animation-delay:2.005s">y</span></span><span class="send">↑</span></div>
+</div>
+</section>
